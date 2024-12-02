@@ -1,0 +1,6 @@
+[submodule "Client"]
+	path = Client
+	url = https://github.com/akhiln2003/Buxlo-Client.git
+[submodule "Microservice/auth"]
+	path = Microservice/auth
+	url = https://github.com/akhiln2003/Buxlo-auth-service.git
