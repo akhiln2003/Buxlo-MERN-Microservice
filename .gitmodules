@@ -1,0 +1,27 @@
+[submodule "client"]
+	path = client
+	url = https://github.com/akhiln2003/Buxlo-Client.git
+[submodule "Microservices/payment"]
+	path = Microservices/payment
+	url = https://github.com/akhiln2003/Buxlo-payment-service.git
+[submodule "Microservices/adv"]
+	path = Microservices/adv
+	url = https://github.com/akhiln2003/Buxlo-adv-service.git
+[submodule "Microservices/apiGateway"]
+	path = Microservices/apiGateway
+	url = https://github.com/akhiln2003/Buxlo-api-gateway.git
+[submodule "Microservices/auth"]
+	path = Microservices/auth
+	url = https://github.com/akhiln2003/Buxlo-auth-service.git
+[submodule "Microservices/booking"]
+	path = Microservices/booking
+	url = https://github.com/akhiln2003/Buxlo-booking-service.git
+[submodule "Microservices/chat"]
+	path = Microservices/chat
+	url = https://github.com/akhiln2003/Buxlo-chat-service.git
+[submodule "Microservices/notification"]
+	path = Microservices/notification
+	url = https://github.com/akhiln2003/Buxlo-notification-service.git
+[submodule "Microservices/user"]
+	path = Microservices/user
+	url = https://github.com/akhiln2003/Buxlo-user-service.git
