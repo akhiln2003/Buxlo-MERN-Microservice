@@ -19,6 +19,7 @@ Here is a glimpse of the BUXLO platform interface:
 To make the architecture easy to digest, we divide the BUXLO ecosystem into two logical perspectives: **Request Routing & Communication** (synchronous flow) and **Data, Events & Caching** (asynchronous & persistence flow).
 
 ### 1. Request Routing & Communication Flow
+
 This flow diagrams how client HTTPS/WebSocket requests are routed via Nginx Ingress and the API Gateway, and shows the direct inter-service synchronous **gRPC** channels used for low-latency queries.
 
 ```mermaid
@@ -34,7 +35,7 @@ flowchart TD
     Client["📱 React Frontend / SPA"]:::client
     Ingress["🛡️ Nginx Ingress Controller"]:::ingress
     Gateway["🔌 API Gateway (Port 4000)"]:::gateway
-    
+
     subgraph Microservices ["⚙️ Core Backend Services"]
         AuthSvc["🔑 Auth Service<br/>(Port 4001)"]:::service
         UserSvc["👤 User Service<br/>(Port 4002)"]:::service
@@ -50,7 +51,7 @@ flowchart TD
 
     %% Flow Connections
     Client -->|HTTPS / WSS| Ingress
-    
+
     %% Ingress routing
     Ingress -->|/| Gateway
     Ingress -->|/socket.io| ChatWS
@@ -70,6 +71,7 @@ flowchart TD
 ```
 
 ### 2. Data, Events & Caching Flow
+
 This diagram details the event-driven publishing/subscribing via **Apache Kafka**, session caching with **Redis**, document storage using **MongoDB**, relational billing schemas with **PostgreSQL**, and external cloud/payment integrations.
 
 ```mermaid
@@ -118,29 +120,13 @@ flowchart TD
 
     %% Database Flow
     AuthSvc & UserSvc & BookSvc & ChatWS & NotifWS & AdvSvc -->|Persist Document| MongoDB
-    PaySvc -->|Persist SQL (TypeORM)| PostgreSQL
+    PaySvc -->|"Persist SQL (TypeORM)"| PostgreSQL
 
     %% Cloud & External Flow
     AuthSvc & UserSvc & BookSvc & ChatWS & NotifWS & AdvSvc -->|Uploads / Presigned URLs| S3
     PaySvc -->|Process Credit Card| Stripe
     PaySvc -->|Process Bank Transfer| Dwolla
 ```
-
----
-
-## 🛠️ Microservices Ecosystem
-
-| Microservice | Folder | HTTP Port | gRPC Port | Primary Database | Key Functions |
-| :--- | :--- | :---: | :---: | :--- | :--- |
-| **API Gateway** | `apiGateway/` | `4000` | N/A | None | Request routing, CORS configuration, helmet security headers, SSL termination. |
-| **Authentication** | `auth/` | `4001` | `50054` | MongoDB (`Auth`) | Signups/Logins, Google OAuth 2.0, JWT Lifecycles (Access/Refresh), MFA/OTP via NodeMailer, AWS S3 image storage. |
-| **User Service** | `user/` | `4002` | `50051`, `50053` | MongoDB (`User`) | Mentor/Student profile management, rating system, profile updates, AWS S3 integrations. |
-| **Payment Service** | `payment/` | `4003` | N/A | PostgreSQL (`payment`) | Subscription management, Stripe integration, Dwolla ACH billing sandbox, TypeORM models. |
-| **Chat Service** | `chat/` | `4004` | N/A | MongoDB (`Chat`) | Real-time messages, file transfers (S3), WebRTC/STUN connections, Socket.io channels, Kafka message ingestion. |
-| **Notification** | `notification/` | `4005` | N/A | MongoDB (`Notification`) | Push alerts, user event notifications, Socket.io notifications, Kafka event consumer. |
-| **Booking Service** | `booking/` | `4006` | `50052` | MongoDB (`Booking`) | Mentorship scheduling, slot configurations, recurring schedules using `rrule` generator. |
-| **Advertisement** | `adv/` | `4007` | N/A | MongoDB (`Adv`) | Banners, sponsored ads placement, S3-backed asset store. |
-| **Common Library** | `common/` | N/A | N/A | N/A | Shared NPM package (`@buxlo/common`) with global exception filters, error handlers, Winston logger, and event definitions. |
 
 ---
 
@@ -193,6 +179,7 @@ BUXLO relies on several core infrastructure resources to maintain data integrity
 ### Prerequisites
 
 To build, test, and run the entire BUXLO ecosystem locally, ensure you have:
+
 - **Node.js** (v18.x or later)
 - **npm** (v9.x or later)
 - **Docker & Docker Compose**
@@ -205,16 +192,20 @@ To build, test, and run the entire BUXLO ecosystem locally, ensure you have:
 Docker Compose builds and spins up all backend microservices alongside Zookeeper, Kafka, Redis, and PostgreSQL instances.
 
 #### Step 1: Clone and Configure Environment Variables
+
 You need to copy the `.env.example` configurations into `.env` files for each microservice and the client. Refer to the directory-specific READMEs for exact values.
 
 #### Step 2: Spin Up Infrastructure and Services
+
 From the root of the workspace, run:
+
 ```bash
 cd Microservices
 docker-compose up --build -d
 ```
 
 This will:
+
 1. Initialize the `buxlo-network` bridge network.
 2. Spin up `zookeeper`, `kafka`, and `redis` containers.
 3. Spin up `postgres` and provision the `payment` database.
@@ -222,17 +213,21 @@ This will:
 5. Expose ports (e.g., API Gateway at `http://localhost:4000`).
 
 Check container health:
+
 ```bash
 docker-compose ps
 ```
 
 #### Step 3: Run the Frontend Client
+
 Open a new terminal tab:
+
 ```bash
 cd client
 npm install
 npm run dev
 ```
+
 The client will start on `http://localhost:5173`.
 
 ---
@@ -242,18 +237,22 @@ The client will start on `http://localhost:5173`.
 BUXLO provides complete manifests for running in a Kubernetes environment under the `buxlo` namespace.
 
 1. **Create the Namespace**:
+
    ```bash
    kubectl apply -f Microservices/k8s/development/namespaces/buxlo-namespace.yaml
    ```
 
 2. **Apply Infrastructure Configurations**:
+
    ```bash
    kubectl apply -f Microservices/k8s/development/infrastructure/buxlo-dependencies.yaml
    ```
+
    This deploys Redis, PostgreSQL, Zookeeper, and Kafka to the cluster.
 
 3. **Configure Environment Secrets**:
    Deploy the secrets mapped inside the deployment files:
+
    ```bash
    kubectl create secret generic buxlo-chat-env --from-env-file=./Microservices/chat/.env -n buxlo
    # Repeat for auth, user, booking, payment, notification, adv, and apiGateway.
@@ -261,12 +260,14 @@ BUXLO provides complete manifests for running in a Kubernetes environment under 
 
 4. **Deploy the Services**:
    Apply all deployment configuration files inside the services directory:
+
    ```bash
    kubectl apply -f Microservices/k8s/development/services/
    ```
 
 5. **Deploy the Ingress Controller**:
    Deploy the Cert Manager cluster issuer and Ingress router config:
+
    ```bash
    kubectl apply -f Microservices/k8s/development/ingress/
    ```
