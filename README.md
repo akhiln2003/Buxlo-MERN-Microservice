@@ -4,76 +4,126 @@ BUXLO is a high-performance, enterprise-grade, personalized financial monitoring
 
 ---
 
+## 🔍 Sneak Peek
+
+Here is a glimpse of the BUXLO platform interface:
+
+<p align="center">
+  <img src="docs/assets/sneak_peek.png" alt="BUXLO Landing Page Sneak Peek" width="900" style="border-radius: 8px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);" />
+</p>
+
+---
+
 ## 🏗️ System Architecture
 
-BUXLO is designed to be highly scalable, fault-tolerant, and easy to deploy. Below is an overview of the platform's architectural topology, including client request flow, message routing, inter-service gRPC communication, and persistence layers.
+To make the architecture easy to digest, we divide the BUXLO ecosystem into two logical perspectives: **Request Routing & Communication** (synchronous flow) and **Data, Events & Caching** (asynchronous & persistence flow).
+
+### 1. Request Routing & Communication Flow
+This flow diagrams how client HTTPS/WebSocket requests are routed via Nginx Ingress and the API Gateway, and shows the direct inter-service synchronous **gRPC** channels used for low-latency queries.
 
 ```mermaid
-graph TD
-    %% Clients
-    Client[React Frontend / SPA] -->|HTTPS / WSS| Ingress[Nginx Ingress Controller]
+flowchart TD
+    %% Custom Styling
+    classDef client fill:#E1F5FE,stroke:#0288D1,stroke-width:2px,color:#01579B;
+    classDef ingress fill:#ECEFF1,stroke:#455A64,stroke-width:2px,color:#263238;
+    classDef gateway fill:#EDE7F6,stroke:#5E35B1,stroke-width:2px,color:#311B92;
+    classDef service fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20;
+    classDef socket fill:#FFF9C4,stroke:#FBC02D,stroke-width:2px,color:#F57F17;
+
+    %% Nodes
+    Client["📱 React Frontend / SPA"]:::client
+    Ingress["🛡️ Nginx Ingress Controller"]:::ingress
+    Gateway["🔌 API Gateway (Port 4000)"]:::gateway
     
-    %% Ingress & Gateway Routing
-    subgraph K8s [Kubernetes Namespace: buxlo]
-        Ingress -->|/socket.io| ChatWS[buxlo-chat]
-        Ingress -->|/notification-socket| NotifWS[buxlo-notification]
-        Ingress -->|/| APIGateway[buxlo-apigateway :4000]
-        
-        %% API Gateway Proxying
-        APIGateway -->|HTTP Proxy| AuthSvc[buxlo-auth :4001]
-        APIGateway -->|HTTP Proxy| UserSvc[buxlo-user :4002]
-        APIGateway -->|HTTP Proxy| PaySvc[buxlo-payment :4003]
-        APIGateway -->|HTTP Proxy| BookSvc[buxlo-booking :4006]
-        APIGateway -->|HTTP Proxy| AdvSvc[buxlo-adv :4007]
-        
-        %% gRPC Channels
-        AuthSvcrv{gRPC Channels}
-        AuthSvc -->|gRPC: Get Profile| UserSvc
-        PaySvc -->|gRPC: Verify Slot| BookSvc
-        PaySvc -->|gRPC: Update User Level| UserSvc
-        
-        %% Event Broker (Kafka)
-        Kafka[[Kafka Broker :9092]]
-        AuthSvc -.->|Publish events| Kafka
-        UserSvc -.->|Publish events| Kafka
-        BookSvc -.->|Publish events| Kafka
-        PaySvc -.->|Publish events| Kafka
-        
-        %% Event Consumers
-        Kafka -.->|Consume events| ChatWS
-        Kafka -.->|Consume events| NotifWS
-        
-        %% Shared Caching
-        Redis[(Redis Cache :6379)]
-        AuthSvc <-->|Cache Auth State| Redis
-        UserSvc <-->|Cache User Profiles| Redis
+    subgraph Microservices ["⚙️ Core Backend Services"]
+        AuthSvc["🔑 Auth Service<br/>(Port 4001)"]:::service
+        UserSvc["👤 User Service<br/>(Port 4002)"]:::service
+        PaySvc["💳 Payment Service<br/>(Port 4003)"]:::service
+        BookSvc["📅 Booking Service<br/>(Port 4006)"]:::service
+        AdvSvc["📢 Adv Service<br/>(Port 4007)"]:::service
     end
+
+    subgraph RealTime ["⚡ Real-Time Services"]
+        ChatWS["💬 Chat Service<br/>(Port 4004)"]:::socket
+        NotifWS["🔔 Notification Service<br/>(Port 4005)"]:::socket
+    end
+
+    %% Flow Connections
+    Client -->|HTTPS / WSS| Ingress
     
-    %% Third Party and Cloud Resources
-    AWS3[(AWS S3 Bucket)]
-    StripeAPI[[Stripe API]]
-    DwollaAPI[[Dwolla Sandbox]]
-    
-    AuthSvc & UserSvc & ChatWS & NotifWS & AdvSvc & BookSvc -->|Presigned URLs & Uploads| AWS3
-    PaySvc -->|Process Payments| StripeAPI
-    PaySvc -->|ACH Transfers| DwollaAPI
-    
-    %% Database Tier
-    DBAuth[(MongoDB: Auth)]
-    DBUser[(MongoDB: User)]
-    DBBook[(MongoDB: Booking)]
-    DBChat[(MongoDB: Chat)]
-    DBNotif[(MongoDB: Notification)]
-    DBAdv[(MongoDB: Adv)]
-    DBPay[(PostgreSQL: Payment)]
-    
-    AuthSvc --> DBAuth
-    UserSvc --> DBUser
-    BookSvc --> DBBook
-    ChatWS --> DBChat
-    NotifWS --> DBNotif
-    AdvSvc --> DBAdv
-    PaySvc -->|TypeORM| DBPay
+    %% Ingress routing
+    Ingress -->|/| Gateway
+    Ingress -->|/socket.io| ChatWS
+    Ingress -->|/notification-socket| NotifWS
+
+    %% Gateway proxying
+    Gateway -->|HTTP Proxy| AuthSvc
+    Gateway -->|HTTP Proxy| UserSvc
+    Gateway -->|HTTP Proxy| PaySvc
+    Gateway -->|HTTP Proxy| BookSvc
+    Gateway -->|HTTP Proxy| AdvSvc
+
+    %% Internal gRPC Communication
+    AuthSvc ===>|gRPC: Get Profile| UserSvc
+    PaySvc ===>|gRPC: Verify Slot| BookSvc
+    PaySvc ===>|gRPC: Update User Level| UserSvc
+```
+
+### 2. Data, Events & Caching Flow
+This diagram details the event-driven publishing/subscribing via **Apache Kafka**, session caching with **Redis**, document storage using **MongoDB**, relational billing schemas with **PostgreSQL**, and external cloud/payment integrations.
+
+```mermaid
+flowchart TD
+    %% Custom Styling
+    classDef service fill:#E8F5E9,stroke:#2E7D32,stroke-width:2px,color:#1B5E20;
+    classDef broker fill:#E0F7FA,stroke:#00ACC1,stroke-width:2px,color:#006064;
+    classDef cache fill:#FCE4EC,stroke:#D81B60,stroke-width:2px,color:#880E4F;
+    classDef db fill:#FFF3E0,stroke:#EF6C00,stroke-width:2px,color:#E65100;
+    classDef external fill:#F5F5F5,stroke:#757575,stroke-width:2px,color:#212121;
+
+    %% Nodes
+    subgraph Services ["⚙️ Backend Microservices"]
+        AuthSvc["🔑 Auth Service"]:::service
+        UserSvc["👤 User Service"]:::service
+        PaySvc["💳 Payment Service"]:::service
+        BookSvc["📅 Booking Service"]:::service
+        ChatWS["💬 Chat Service"]:::service
+        NotifWS["🔔 Notification Service"]:::service
+        AdvSvc["📢 Adv Service"]:::service
+    end
+
+    %% Caching & Message Broker
+    Redis[("🧠 Redis Cache<br/>(Auth & Profile Caching)")]:::cache
+    Kafka[("🔀 Kafka Message Broker<br/>(Event Streams)")]:::broker
+
+    %% Databases
+    subgraph DatabaseTier ["💾 Database Persistence"]
+        MongoDB[("🍃 MongoDB Documents<br/>(Auth, User, Booking, Chat, Notif, Adv DBs)")]:::db
+        PostgreSQL[("🐘 PostgreSQL Relational<br/>(Payment DB)")]:::db
+    end
+
+    %% External Systems
+    subgraph External ["☁️ Cloud Storage & Payments"]
+        S3[("🪣 AWS S3 Bucket<br/>(Image & File Uploads)")]:::external
+        Stripe[["💳 Stripe API<br/>(Sub Invoices)"]]:::external
+        Dwolla[["🏦 Dwolla Sandbox<br/>(ACH Transfers)"]]:::external
+    end
+
+    %% Event Broker Flow
+    AuthSvc & UserSvc & PaySvc & BookSvc -->|Publish events| Kafka
+    Kafka -->|Consume events| ChatWS & NotifWS
+
+    %% Cache Flow
+    AuthSvc & UserSvc <-->|Cache state| Redis
+
+    %% Database Flow
+    AuthSvc & UserSvc & BookSvc & ChatWS & NotifWS & AdvSvc -->|Persist Document| MongoDB
+    PaySvc -->|Persist SQL (TypeORM)| PostgreSQL
+
+    %% Cloud & External Flow
+    AuthSvc & UserSvc & BookSvc & ChatWS & NotifWS & AdvSvc -->|Uploads / Presigned URLs| S3
+    PaySvc -->|Process Credit Card| Stripe
+    PaySvc -->|Process Bank Transfer| Dwolla
 ```
 
 ---
